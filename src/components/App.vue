@@ -39,14 +39,14 @@
           <!-- Background layer: Comment shading (behind audio bars) -->
           <div class="waveform waveform-comments">
             <div class="wv-comment-wrapper" v-for="(s, i) in filteredData" :key="'cmt-' + i">
-              <!-- Multiple shade layers per bar - one for each comment, with stacking heights -->
+              <!-- Multiple shade layers per bar - one for each comment, using rank for consistent heights -->
               <div v-if="barsWithComments.includes(i)"
                 v-for="(cmt, ci) in commentsForBar(i)" 
                 :key="ci"
                 class="wv-comment-shade"
                 :style="{ 
-                  height: (100 - ci * 5) + '%',
-                  opacity: 0.25 + ci * 0.08
+                  height: (100 - cmt.rank * 5) + '%',
+                  opacity: 0.25 + cmt.rank * 0.08
                 }">
               </div>
             </div>

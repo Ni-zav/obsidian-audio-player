@@ -1,27 +1,6 @@
 <template>
   <div class="audio-player-ui" tabindex="0" v-on:click.prevent>
     <div class="player-title">{{ displayTitle }}</div>
-    <!-- Video container with toggle -->
-    <div v-if="isVideo" class="video-container">
-      <div class="video-toggle" @click="toggleVideoEmbed" ref="videoToggleButton">
-        <span class="video-toggle-icon" ref="videoToggleIcon"></span>
-        <span class="video-toggle-label">{{ showVideoEmbed ? 'Hide Video' : 'Show Video' }}</span>
-      </div>
-      <div v-show="showVideoEmbed" class="video-wrapper">
-        <video 
-          ref="videoElement"
-          class="video-player"
-          :src="srcPath"
-          @timeupdate="videoTimeUpdateHandler"
-          @loadedmetadata="videoLoadedHandler"
-          @play="videoPlayHandler"
-          @pause="videoPauseHandler"
-        ></video>
-        <div class="video-timestamp-overlay">
-          <span class="video-timestamp">{{ displayedCurrentTime }}</span>
-        </div>
-      </div>
-    </div>
     <div class="horiz">
       <div v-show="!smallSize" class="vert">
         <div class="playpause playpause-controls" @click="skipToBeginning" ref="skipBackButton"></div>
@@ -57,6 +36,43 @@
             {{ displayedDuration }}
           </span>
         </div>
+      </div>
+    </div>
+    <!-- Video container - positioned BELOW waveform -->
+    <div v-if="isVideo" class="video-container">
+      <div v-show="showVideoEmbed" class="video-wrapper">
+        <video 
+          ref="videoElement"
+          class="video-player"
+          :src="srcPath"
+          @timeupdate="videoTimeUpdateHandler"
+          @loadedmetadata="videoLoadedHandler"
+          @play="videoPlayHandler"
+          @pause="videoPauseHandler"
+          @click="togglePlay"
+        ></video>
+        <!-- Top overlay with toggle (low opacity, hover to reveal) -->
+        <div class="video-top-overlay">
+          <div class="video-toggle" @click.stop="toggleVideoEmbed" ref="videoToggleButton">
+            <span class="video-toggle-icon" ref="videoToggleIcon"></span>
+            <span class="video-toggle-label">Hide</span>
+          </div>
+        </div>
+        <!-- Bottom overlay with controls and timestamp -->
+        <div class="video-bottom-overlay">
+          <div class="video-controls">
+            <div class="video-control-btn" @click.stop="skipToBeginning" ref="videoSkipBackBtn"></div>
+            <div class="video-control-btn video-playpause" @click.stop="togglePlay" ref="videoPlayPauseBtn"></div>
+            <div class="video-control-btn" @click.stop="toggleLooping" v-bind:class="{ 'looping': looping }" ref="videoLoopBtn"></div>
+          </div>
+          <span class="video-timestamp">{{ displayedCurrentTime }}</span>
+          <span class="video-duration">{{ displayedDuration }}</span>
+        </div>
+      </div>
+      <!-- Show Video button when video is hidden -->
+      <div v-show="!showVideoEmbed" class="video-toggle-external" @click="toggleVideoEmbed">
+        <span class="video-toggle-icon" ref="videoToggleIconExternal"></span>
+        <span class="video-toggle-label">Show Video</span>
       </div>
     </div>
     <div class="comment-list">
@@ -319,7 +335,13 @@ export default defineComponent({
       }
     },
 
-    setBtnIcon(icon: string) { setIcon(this.button, icon); },
+    setBtnIcon(icon: string) { 
+      setIcon(this.button, icon);
+      // Also update video play/pause button if visible
+      if (this.$refs.videoPlayPauseBtn) {
+        setIcon(this.$refs.videoPlayPauseBtn, icon);
+      }
+    },
 
     getComments(): Array<AudioComment> {
       const cmtElems = Array.from(this.content?.children || []);
@@ -482,26 +504,40 @@ export default defineComponent({
       
       // Sync video with current audio state when showing
       if (this.showVideoEmbed && this.$refs.videoElement) {
-        const video = this.$refs.videoElement as HTMLVideoElement;
-        video.currentTime = this.currentTime;
-        video.loop = this.looping;
-        if (this.playing) {
-          video.play();
-        }
+        this.$nextTick(() => {
+          this.updateVideoControlIcons();
+          const video = this.$refs.videoElement as HTMLVideoElement;
+          video.currentTime = this.currentTime;
+          video.loop = this.looping;
+          if (this.playing) {
+            video.play();
+          }
+        });
       }
     },
     updateVideoToggleIcon() {
       if (this.$refs.videoToggleIcon) {
         setIcon(this.$refs.videoToggleIcon, this.showVideoEmbed ? 'eye-off' : 'eye');
       }
+      if (this.$refs.videoToggleIconExternal) {
+        setIcon(this.$refs.videoToggleIconExternal, 'eye');
+      }
+    },
+    updateVideoControlIcons() {
+      if (this.$refs.videoPlayPauseBtn) {
+        setIcon(this.$refs.videoPlayPauseBtn, this.playing ? 'pause' : 'play');
+      }
+      if (this.$refs.videoSkipBackBtn) {
+        setIcon(this.$refs.videoSkipBackBtn, 'skip-back');
+      }
+      if (this.$refs.videoLoopBtn) {
+        setIcon(this.$refs.videoLoopBtn, 'repeat');
+      }
     },
     videoTimeUpdateHandler() {
       if (this.showVideoEmbed && this.$refs.videoElement) {
         const video = this.$refs.videoElement as HTMLVideoElement;
-        // Sync audio with video time
-        if (this.isCurrent() && Math.abs(video.currentTime - this.audio.currentTime) > 0.5) {
-          this.audio.currentTime = video.currentTime;
-        }
+        // Only update currentTime from video - don't sync audio here to avoid lag
         this.currentTime = video.currentTime;
       }
     },
@@ -524,6 +560,7 @@ export default defineComponent({
         this.audio.play();
         this.playing = true;
         this.setBtnIcon('pause');
+        this.updateVideoControlIcons();
       }
     },
     videoPauseHandler() {
@@ -531,6 +568,7 @@ export default defineComponent({
         this.audio.pause();
         this.playing = false;
         this.setBtnIcon('play');
+        this.updateVideoControlIcons();
       }
     },
     syncVideoWithAudio() {
@@ -572,9 +610,10 @@ export default defineComponent({
     setIcon(this.$refs.loopButton, 'repeat');
     setIcon(this.$refs.skipBackButton, 'skip-back');
     
-    // Initialize video toggle icon if video
+    // Initialize video icons if video
     if (this.isVideo) {
       this.updateVideoToggleIcon();
+      this.updateVideoControlIcons();
     }
 
     // Add event listeners

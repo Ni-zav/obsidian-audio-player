@@ -278,44 +278,42 @@ If your plugin does not need CSS, delete this file.
 	z-index: 2;
 }
 
-/* Audio waveform bars */
+/* Audio waveform bars - uses CSS variable for smooth fill animation */
 .wv {
 	flex: 1 1 0;
 	min-width: 0;
-	background-color: var(--color-base-50);
-	transition: background-color 0.15s ease;
 	cursor: pointer;
+	/* Default progress is 0% */
+	--bar-progress: 0%;
+	/* Gradient fill from bottom based on progress */
+	background: linear-gradient(to top,
+			var(--color-accent-1) var(--bar-progress),
+			var(--color-base-50) var(--bar-progress));
 }
 
-/* Video mode waveform - lighter colors */
+/* Video mode waveform - override colors for gradient */
 .player-controls-wrapper.on-video .wv {
-	background-color: rgba(255, 255, 255, 0.25);
+	background: linear-gradient(to top,
+			var(--color-accent-1) var(--bar-progress),
+			rgba(255, 255, 255, 0.25) var(--bar-progress));
 }
 
-.player-controls-wrapper.on-video .wv.played {
-	background-color: var(--color-accent-1);
-}
-
-.wv:hover,
-.wv.played:hover {
-	background-color: var(--color-base-100);
+/* Hover states - solid color override */
+.wv:hover {
+	background: var(--color-base-100);
 }
 
 .player-controls-wrapper.on-video .wv:hover {
-	background-color: rgba(255, 255, 255, 0.5);
+	background: rgba(255, 255, 255, 0.5);
 }
 
 .wv:active {
-	background-color: var(--color-base-10);
+	background: var(--color-base-10);
 }
 
-.wv.played {
-	background-color: var(--color-accent-1);
-}
-
-.wv.highlighted,
-.wv.played.highlighted {
-	background-color: var(--color-base-100);
+/* Highlighted bars - solid color override */
+.wv.highlighted {
+	background: var(--color-base-100);
 }
 
 /* Inline timeline - sits next to repeat button */

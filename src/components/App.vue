@@ -70,10 +70,9 @@
                @mousemove="handleWaveformMouseMove($event)" 
                @mouseout="unhighlightComment(); hideWaveformTooltip();"
                @mousedown="handleWaveformMouseDown($event)">
-            <div class="wv" v-for="(s, i) in filteredData" :key="srcPath + i" :class="{
-              'played': i <= currentBar,
-              'highlighted': highlightedBars.includes(i)
-            }" :style="{ height: s * 35 + 'px' }">
+            <div class="wv" v-for="(s, i) in filteredData" :key="srcPath + i" 
+                 :class="{ 'highlighted': highlightedBars.includes(i) }" 
+                 :style="getBarStyle(s, i)">
             </div>
           </div>
         </div>
@@ -153,6 +152,9 @@ export default defineComponent({
       // Waveform tooltip state for realistic hover time
       waveformTooltipEl: null as HTMLElement | null,
       waveformTooltipTimeout: null as ReturnType<typeof setTimeout> | null,
+      
+      // Smooth time update animation frame
+      animationFrameId: null as number | null,
     }
   },
   computed: {
@@ -188,12 +190,49 @@ export default defineComponent({
         // Very long audio (>10min): cap at 400 bars
         return Math.min(400, Math.ceil(this.duration / 3));
       }
+    },
+    
+    // Calculate progress within the current bar (0 to 100%)
+    currentBarProgress() {
+      if (this.duration <= 0 || this.nSamples <= 0) return 0;
+      
+      const barDuration = this.duration / this.nSamples;
+      const barStartTime = this.currentBar * barDuration;
+      const progressInBar = (this.currentTime - barStartTime) / barDuration;
+      
+      // Clamp between 0 and 100
+      return Math.max(0, Math.min(100, progressInBar * 100));
     }
   },
   methods: {
     getSectionInfo() { return this.ctx.getSectionInfo(this.mdElement); },
     getParentWidth() { return this.mdElement.clientWidth },
     isCurrent() { return this.audio.src === this.srcPath; },
+    
+    // Get style for a waveform bar - uses CSS variable for smooth progress animation
+    getBarStyle(s: number, i: number) {
+      const height = s * 35 + 'px';
+      
+      if (i === this.currentBar) {
+        // Currently playing bar: set progress variable (0-100)
+        return {
+          height,
+          '--bar-progress': `${this.currentBarProgress}%`
+        };
+      } else if (i < this.currentBar) {
+        // Played bars: set progress to 100% for seamless transition
+        return {
+          height,
+          '--bar-progress': '100%'
+        };
+      }
+      
+      // Future bars: progress at 0%
+      return { 
+        height,
+        '--bar-progress': '0%'
+      };
+    },
     onResize() {
       this.smallSize = this.$el.clientWidth < 300;
       // No longer recalculating bars on resize to avoid uneven gaps
@@ -328,6 +367,9 @@ export default defineComponent({
       this.playing = true;
       this.setBtnIcon('pause');
       
+      // Start smooth time updates
+      this.startSmoothTimeUpdate();
+      
       // Sync video play
       if (this.showVideoEmbed && this.$refs.videoElement) {
         const video = this.$refs.videoElement as HTMLVideoElement;
@@ -339,6 +381,9 @@ export default defineComponent({
       this.audio?.pause();
       this.playing = false;
       this.setBtnIcon('play');
+      
+      // Stop smooth time updates
+      this.stopSmoothTimeUpdate();
       
       // Sync video pause
       if (this.showVideoEmbed && this.$refs.videoElement) {
@@ -614,6 +659,9 @@ export default defineComponent({
         this.playing = true;
         this.setBtnIcon('pause');
         this.updateVideoControlIcons();
+        
+        // Start smooth time updates
+        this.startSmoothTimeUpdate();
       }
     },
     videoPauseHandler() {
@@ -622,6 +670,9 @@ export default defineComponent({
         this.playing = false;
         this.setBtnIcon('play');
         this.updateVideoControlIcons();
+        
+        // Stop smooth time updates
+        this.stopSmoothTimeUpdate();
       }
     },
     syncVideoWithAudio() {
@@ -707,6 +758,30 @@ export default defineComponent({
       if (this.waveformTooltipEl) {
         this.waveformTooltipEl.style.display = 'none';
       }
+    },
+    
+    // Start smooth time update using requestAnimationFrame for real-time display
+    startSmoothTimeUpdate() {
+      // Cancel any existing animation frame
+      this.stopSmoothTimeUpdate();
+      
+      const updateLoop = () => {
+        if (this.playing && this.isCurrent() && !this.audio.paused) {
+          // Directly poll audio.currentTime for smooth updates
+          this.currentTime = this.audio.currentTime;
+          this.animationFrameId = requestAnimationFrame(updateLoop);
+        }
+      };
+      
+      this.animationFrameId = requestAnimationFrame(updateLoop);
+    },
+    
+    // Stop smooth time update
+    stopSmoothTimeUpdate() {
+      if (this.animationFrameId !== null) {
+        cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+      }
     }
   },
 
@@ -774,6 +849,11 @@ export default defineComponent({
       this.setBtnIcon(this.audio.paused ? 'play' : 'pause');
       // Get current looping state
       this.looping = this.audio.loop;
+      // Start smooth time updates if already playing
+      if (!this.audio.paused) {
+        this.playing = true;
+        this.startSmoothTimeUpdate();
+      }
     }
 
     // Load comments
@@ -800,6 +880,8 @@ export default defineComponent({
   },
   beforeUnmount() {
     this.audio.removeEventListener("timeupdate", this.timeUpdateHandler);
+    // Stop smooth time updates
+    this.stopSmoothTimeUpdate();
   },
   beforeDestroy() {
     this.ro.unobserve(this.$el);

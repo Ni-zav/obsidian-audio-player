@@ -1,22 +1,48 @@
 <template>
   <div class="audio-player-ui" tabindex="0" v-on:click.prevent>
     <div class="player-title">{{ displayTitle }}</div>
-    <div class="horiz">
-      <div v-show="!smallSize" class="vert">
-        <div class="playpause playpause-controls" @click="skipToBeginning" ref="skipBackButton"></div>
-        <div class="playpause" @click="togglePlay" ref="playpause"></div>
-        <div class="playpause playpause-controls" @click="toggleLooping" v-bind:class="{ 'looping': looping }" ref="loopButton">
+    
+    <!-- Video wrapper - wraps around controls when video is showing -->
+    <div class="player-main" :class="{ 'video-mode': isVideo && showVideoEmbed }">
+      <!-- Video element (behind controls when showing) -->
+      <video 
+        v-if="isVideo"
+        v-show="showVideoEmbed"
+        ref="videoElement"
+        class="video-player"
+        :src="srcPath"
+        @timeupdate="videoTimeUpdateHandler"
+        @loadedmetadata="videoLoadedHandler"
+        @play="videoPlayHandler"
+        @pause="videoPauseHandler"
+        @click="togglePlay"
+      ></video>
+      
+      <!-- Controls overlay (always visible, on top of video when showing) -->
+      <div class="player-controls-wrapper" :class="{ 'on-video': isVideo && showVideoEmbed }">
+        <!-- Top row: Play controls + Eye toggle -->
+        <div class="controls-row">
+          <div class="controls-left">
+            <div class="control-btn control-small" @click="skipToBeginning" ref="skipBackButton"></div>
+            <div class="control-btn control-play" @click="togglePlay" ref="playpause"></div>
+            <div class="control-btn control-small" @click="toggleLooping" :class="{ 'looping': looping }" ref="loopButton"></div>
+          </div>
+          <div class="controls-right" v-if="isVideo">
+            <div class="control-btn control-small control-eye" @click="toggleVideoEmbed" ref="videoToggleButton">
+              <span ref="videoToggleIcon"></span>
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="vert wide">
+        
+        <!-- Waveform - full width -->
         <div class="waveform">
-          <div class="wv" ref="wv" v-for="(s, i) in filteredData" :key="srcPath + i" v-bind:class="{
+          <div class="wv" ref="wv" v-for="(s, i) in filteredData" :key="srcPath + i" :class="{
             'played': i <= currentBar,
             'commented': barsWithComments.includes(i),
             'highlighted': highlightedBars.includes(i)
           }" @mouseover="setWvTimestampTooltip(i); highlightCommentForBar(i);" @mouseout="unhighlightComment();"
               @mousedown="barMouseDownHandler(i);" :style="{ height: s * 50 + 'px' }">
-            <div class="wv-shade" v-if="barsWithComments.includes(i)" v-for="cmt in commentsForBar(i)" v-bind:class="{
+            <div class="wv-shade" v-if="barsWithComments.includes(i)" v-for="cmt in commentsForBar(i)" :class="{
               'begin': hasBeginSeparator(cmt, i),
               'end': hasEndSeparator(cmt, i)
             }" :style="{
@@ -27,9 +53,10 @@
           </div>
         </div>
         <div class="moodbar" v-html="displayedMoodbar"></div>
+        
+        <!-- Timeline - full width -->
         <div class="timeline">
-          <span class="current-time" @mouseover="setCopyTimestampTooltip" @click="copyTimestampToClipboard"
-            ref="currentTime">
+          <span class="current-time" @mouseover="setCopyTimestampTooltip" @click="copyTimestampToClipboard" ref="currentTime">
             {{ displayedCurrentTime }}
           </span>
           <span class="duration">
@@ -38,51 +65,16 @@
         </div>
       </div>
     </div>
-    <!-- Video container - positioned BELOW waveform -->
-    <div v-if="isVideo" class="video-container">
-      <div v-show="showVideoEmbed" class="video-wrapper">
-        <video 
-          ref="videoElement"
-          class="video-player"
-          :src="srcPath"
-          @timeupdate="videoTimeUpdateHandler"
-          @loadedmetadata="videoLoadedHandler"
-          @play="videoPlayHandler"
-          @pause="videoPauseHandler"
-          @click="togglePlay"
-        ></video>
-        <!-- Top overlay with toggle (low opacity, hover to reveal) -->
-        <div class="video-top-overlay">
-          <div class="video-toggle" @click.stop="toggleVideoEmbed" ref="videoToggleButton">
-            <span class="video-toggle-icon" ref="videoToggleIcon"></span>
-            <span class="video-toggle-label">Hide</span>
-          </div>
-        </div>
-        <!-- Bottom overlay with controls and timestamp -->
-        <div class="video-bottom-overlay">
-          <div class="video-controls">
-            <div class="video-control-btn" @click.stop="skipToBeginning" ref="videoSkipBackBtn"></div>
-            <div class="video-control-btn video-playpause" @click.stop="togglePlay" ref="videoPlayPauseBtn"></div>
-            <div class="video-control-btn" @click.stop="toggleLooping" v-bind:class="{ 'looping': looping }" ref="videoLoopBtn"></div>
-          </div>
-          <span class="video-timestamp">{{ displayedCurrentTime }}</span>
-          <span class="video-duration">{{ displayedDuration }}</span>
-        </div>
-      </div>
-      <!-- Show Video button when video is hidden -->
-      <div v-show="!showVideoEmbed" class="video-toggle-external" @click="toggleVideoEmbed">
-        <span class="video-toggle-icon" ref="videoToggleIconExternal"></span>
-        <span class="video-toggle-label">Show Video</span>
-      </div>
-    </div>
+    
+    <!-- Comment list -->
     <div class="comment-list">
-      <AudioCommentVue ref="audiocomment" v-for="cmt in commentsSorted" v-bind:class="{
+      <AudioCommentVue ref="audiocomment" v-for="cmt in commentsSorted" :class="{
         'active-comment': cmt == activeComment,
         'current-comment': cmt == currentComment,
         'highlighted-comment': cmt == highlightedComment
       }" @move-playhead="setPlayheadSecs" @mouseover="highlightBars(barsForComment(cmt))"
         @mouseout="unhighlightBars()" :cmt="cmt" :key="cmt.timeString"></AudioCommentVue>
-      <div class="comment" v-if="commentsSorted.length > 0" v-bind:class="{
+      <div class="comment" v-if="commentsSorted.length > 0" :class="{
         'current-comment': currentComment == null
       }">
       </div>
@@ -337,10 +329,6 @@ export default defineComponent({
 
     setBtnIcon(icon: string) { 
       setIcon(this.button, icon);
-      // Also update video play/pause button if visible
-      if (this.$refs.videoPlayPauseBtn) {
-        setIcon(this.$refs.videoPlayPauseBtn, icon);
-      }
     },
 
     getComments(): Array<AudioComment> {
@@ -505,7 +493,6 @@ export default defineComponent({
       // Sync video with current audio state when showing
       if (this.showVideoEmbed && this.$refs.videoElement) {
         this.$nextTick(() => {
-          this.updateVideoControlIcons();
           const video = this.$refs.videoElement as HTMLVideoElement;
           video.currentTime = this.currentTime;
           video.loop = this.looping;
@@ -518,20 +505,6 @@ export default defineComponent({
     updateVideoToggleIcon() {
       if (this.$refs.videoToggleIcon) {
         setIcon(this.$refs.videoToggleIcon, this.showVideoEmbed ? 'eye-off' : 'eye');
-      }
-      if (this.$refs.videoToggleIconExternal) {
-        setIcon(this.$refs.videoToggleIconExternal, 'eye');
-      }
-    },
-    updateVideoControlIcons() {
-      if (this.$refs.videoPlayPauseBtn) {
-        setIcon(this.$refs.videoPlayPauseBtn, this.playing ? 'pause' : 'play');
-      }
-      if (this.$refs.videoSkipBackBtn) {
-        setIcon(this.$refs.videoSkipBackBtn, 'skip-back');
-      }
-      if (this.$refs.videoLoopBtn) {
-        setIcon(this.$refs.videoLoopBtn, 'repeat');
       }
     },
     videoTimeUpdateHandler() {
@@ -610,10 +583,9 @@ export default defineComponent({
     setIcon(this.$refs.loopButton, 'repeat');
     setIcon(this.$refs.skipBackButton, 'skip-back');
     
-    // Initialize video icons if video
+    // Initialize video toggle icon if video
     if (this.isVideo) {
       this.updateVideoToggleIcon();
-      this.updateVideoControlIcons();
     }
 
     // Add event listeners

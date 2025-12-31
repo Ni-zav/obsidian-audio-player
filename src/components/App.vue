@@ -34,22 +34,32 @@
           </div>
         </div>
         
-        <!-- Waveform - full width -->
-        <div class="waveform">
-          <div class="wv" ref="wv" v-for="(s, i) in filteredData" :key="srcPath + i" :class="{
-            'played': i <= currentBar,
-            'commented': barsWithComments.includes(i),
-            'highlighted': highlightedBars.includes(i)
-          }" @mouseover="setWvTimestampTooltip(i); highlightCommentForBar(i);" @mouseout="unhighlightComment();"
-              @mousedown="barMouseDownHandler(i);" :style="{ height: s * 50 + 'px' }">
-            <div class="wv-shade" v-if="barsWithComments.includes(i)" v-for="cmt in commentsForBar(i)" :class="{
-              'begin': hasBeginSeparator(cmt, i),
-              'end': hasEndSeparator(cmt, i)
-            }" :style="{
-                position: 'relative',
-                height: getBarHighlightHeight(s, cmt.rank, commentsForBar(i)) + 'px',
-                'margin-top': getBarHighlightMarginTop(s, cmt.rank, cmt, commentsForBar(i)) + 'px',
-              }"></div>
+        <!-- Waveform container with two layers -->
+        <div class="waveform-container">
+          <!-- Background layer: Comment shading (behind audio bars) -->
+          <div class="waveform waveform-comments">
+            <div class="wv-comment-wrapper" v-for="(s, i) in filteredData" :key="'cmt-' + i">
+              <!-- Multiple shade layers per bar - one for each comment, with stacking heights -->
+              <div v-if="barsWithComments.includes(i)"
+                v-for="(cmt, ci) in commentsForBar(i)" 
+                :key="ci"
+                class="wv-comment-shade"
+                :style="{ 
+                  height: (100 - ci * 5) + '%',
+                  opacity: 0.25 + ci * 0.08
+                }">
+              </div>
+            </div>
+          </div>
+          
+          <!-- Foreground layer: Audio waveform (variable height, on top) -->
+          <div class="waveform waveform-audio">
+            <div class="wv" ref="wv" v-for="(s, i) in filteredData" :key="srcPath + i" :class="{
+              'played': i <= currentBar,
+              'highlighted': highlightedBars.includes(i)
+            }" @mouseover="setWvTimestampTooltip(i); highlightCommentForBar(i);" @mouseout="unhighlightComment();"
+                @mousedown="barMouseDownHandler(i);" :style="{ height: s * 25 + 'px' }">
+            </div>
           </div>
         </div>
         <div class="moodbar" v-html="displayedMoodbar"></div>
@@ -111,6 +121,7 @@ export default defineComponent({
       srcPath: '',
 
       filteredData: [] as number[],
+      rawAudioData: null as Float32Array | null,  // Store raw data for reprocessing
       nSamples: 100,
       duration: 0,
       currentTime: 0,
@@ -142,6 +153,25 @@ export default defineComponent({
     endBars() { return this.commentsSorted.map((c: AudioComment) => c.barEdges[1]) },
     barsWithComments() { return this.comments.map((c: AudioComment) => range(...c.barEdges)).flat().unique(); },
     commentsSorted() { return this.comments.sort((x: AudioComment, y: AudioComment) => x.timeStart - y.timeStart); },
+    
+    // Calculate optimal bar count based on audio duration only (consistent, no resize issues)
+    optimalBarCount() {
+      if (this.duration <= 0) return 100; // default
+      
+      if (this.duration < 30) {
+        // Short audio (<30s): ~100 bars (1 bar per 0.3 sec)
+        return Math.max(50, Math.ceil(this.duration / 0.3));
+      } else if (this.duration < 180) {
+        // Medium audio (30s-3min): ~150-200 bars
+        return Math.min(200, Math.ceil(this.duration / 0.6));
+      } else if (this.duration < 600) {
+        // Long audio (3-10min): 200-300 bars
+        return Math.min(300, Math.ceil(this.duration / 1.5));
+      } else {
+        // Very long audio (>10min): cap at 400 bars
+        return Math.min(400, Math.ceil(this.duration / 3));
+      }
+    }
   },
   methods: {
     getSectionInfo() { return this.ctx.getSectionInfo(this.mdElement); },
@@ -149,6 +179,7 @@ export default defineComponent({
     isCurrent() { return this.audio.src === this.srcPath; },
     onResize() {
       this.smallSize = this.$el.clientWidth < 300;
+      // No longer recalculating bars on resize to avoid uneven gaps
     },
     async loadFile() {
       // read file from vault 
@@ -164,7 +195,11 @@ export default defineComponent({
       }
     },
     saveCache() {
-      localStorage[`${this.filepath}`] = JSON.stringify(this.filteredData);
+      // Cache with current bar count for reference
+      localStorage[`${this.filepath}`] = JSON.stringify({
+        data: this.filteredData,
+        nSamples: this.nSamples
+      });
       localStorage[`${this.filepath}_duration`] = this.duration;
     },
     loadCache(): boolean {
@@ -173,33 +208,56 @@ export default defineComponent({
 
       if (!cachedData) { return false; }
 
-      this.filteredData = JSON.parse(cachedData);
-      this.duration = Number.parseFloat(cachedDuration)
-      return true;
+      try {
+        const cached = JSON.parse(cachedData);
+        // Check if cached data matches current bar count (allow some tolerance)
+        if (cached.data && cached.nSamples) {
+          this.filteredData = cached.data;
+          this.nSamples = cached.nSamples;
+        } else {
+          // Old cache format - still usable
+          this.filteredData = cached;
+        }
+        this.duration = Number.parseFloat(cachedDuration);
+        return true;
+      } catch {
+        return false;
+      }
     },
     async processAudio(path: string) {
       const arrBuf = await window.app.vault.adapter.readBinary(path);
       const audioContext = new AudioContext();
-      const tempArray = [] as number[];
 
       audioContext.decodeAudioData(arrBuf, (buf) => {
-        let rawData = buf.getChannelData(0);
+        this.rawAudioData = buf.getChannelData(0);
         this.duration = buf.duration;
-
-        const blockSize = Math.floor(rawData.length / this.nSamples);
-        for (let i = 0; i < this.nSamples; i++) {
-          let blockStart = blockSize * i;
-          let sum = 0;
-          for (let j = 0; j < blockSize; j++) {
-            sum += Math.abs(rawData[blockStart + j]);
-          }
-          tempArray.push(sum / blockSize);
-        }
-
-        let maxval = Math.max(...tempArray);
-        this.filteredData = tempArray.map(x => x / maxval);
-        this.saveCache();
+        
+        // Calculate optimal bar count and generate waveform
+        this.recalculateBars();
       })
+    },
+    recalculateBars() {
+      if (!this.rawAudioData || !this.duration) return;
+      
+      // Update nSamples to optimal count
+      this.nSamples = this.optimalBarCount;
+      
+      const tempArray = [] as number[];
+      const rawData = this.rawAudioData;
+      const blockSize = Math.floor(rawData.length / this.nSamples);
+      
+      for (let i = 0; i < this.nSamples; i++) {
+        let blockStart = blockSize * i;
+        let sum = 0;
+        for (let j = 0; j < blockSize; j++) {
+          sum += Math.abs(rawData[blockStart + j]);
+        }
+        tempArray.push(sum / blockSize);
+      }
+
+      let maxval = Math.max(...tempArray);
+      this.filteredData = tempArray.map(x => x / maxval);
+      this.saveCache();
     },
     barMouseDownHandler(i: number) {
       let time = i / this.nSamples * this.duration;

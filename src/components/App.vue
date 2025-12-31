@@ -3,7 +3,8 @@
     <div class="player-title">{{ displayTitle }}</div>
     
     <!-- Video wrapper - wraps around controls when video is showing -->
-    <div class="player-main" :class="{ 'video-mode': isVideo && showVideoEmbed }">
+    <div class="player-main" :class="{ 'video-mode': isVideo && showVideoEmbed }" 
+         @mouseenter="isVideoHovered = true" @mouseleave="isVideoHovered = false">
       <!-- Video element (behind controls when showing) -->
       <video 
         v-if="isVideo"
@@ -19,7 +20,10 @@
       ></video>
       
       <!-- Controls overlay (always visible, on top of video when showing) -->
-      <div class="player-controls-wrapper" :class="{ 'on-video': isVideo && showVideoEmbed }">
+      <div class="player-controls-wrapper" :class="{ 
+        'on-video': isVideo && showVideoEmbed,
+        'video-controls-dimmed': isDimmed
+      }">
         <!-- Top row: Play controls + Eye toggle -->
         <div class="controls-row">
           <div class="controls-left">
@@ -143,6 +147,7 @@ export default defineComponent({
       
       // Video-specific state
       showVideoEmbed: false,
+      isVideoHovered: false,
       
       // Waveform tooltip state for realistic hover time
       waveformTooltipEl: null as HTMLElement | null,
@@ -159,6 +164,11 @@ export default defineComponent({
     endBars() { return this.commentsSorted.map((c: AudioComment) => c.barEdges[1]) },
     barsWithComments() { return this.comments.map((c: AudioComment) => range(...c.barEdges)).flat().unique(); },
     commentsSorted() { return this.comments.sort((x: AudioComment, y: AudioComment) => x.timeStart - y.timeStart); },
+    
+    // Check if controls should be dimmed (video mode + playing + not hovered)
+    isDimmed() {
+      return this.isVideo && this.showVideoEmbed && this.playing && !this.isVideoHovered;
+    },
     
     // Calculate optimal bar count based on audio duration only (consistent, no resize issues)
     optimalBarCount() {

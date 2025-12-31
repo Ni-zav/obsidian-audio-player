@@ -476,3 +476,16 @@ If your plugin does not need CSS, delete this file.
 	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 	white-space: nowrap;
 }
+
+/* Dimmed state for video controls when playing and not hovered */
+.player-controls-wrapper.video-controls-dimmed .controls-row,
+.player-controls-wrapper.video-controls-dimmed .waveform-container {
+	opacity: 0.15;
+	transition: opacity 0.4s ease;
+}
+
+/* Ensure they fade back in smoothly */
+.controls-row,
+.waveform-container {
+	transition: opacity 0.4s ease;
+}

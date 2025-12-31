@@ -30,6 +30,15 @@
             <div class="control-btn control-small" @click="skipToBeginning" ref="skipBackButton"></div>
             <div class="control-btn control-play" @click="togglePlay" ref="playpause"></div>
             <div class="control-btn control-small" @click="toggleLooping" :class="{ 'looping': looping }" ref="loopButton"></div>
+            <div class="inline-timeline">
+              <span class="current-time" @mouseover="setCopyTimestampTooltip" @click="copyTimestampToClipboard" ref="currentTime">
+                {{ displayedCurrentTime }}
+              </span>
+              <span class="time-separator">/</span>
+              <span class="duration">
+                {{ displayedDuration }}
+              </span>
+            </div>
           </div>
           <div class="controls-right" v-if="isVideo">
             <div class="control-btn control-small control-eye" @click="toggleVideoEmbed" ref="videoToggleButton">
@@ -70,15 +79,7 @@
         </div>
         <div class="moodbar" v-html="displayedMoodbar"></div>
         
-        <!-- Timeline - full width -->
-        <div class="timeline">
-          <span class="current-time" @mouseover="setCopyTimestampTooltip" @click="copyTimestampToClipboard" ref="currentTime">
-            {{ displayedCurrentTime }}
-          </span>
-          <span class="duration">
-            {{ displayedDuration }}
-          </span>
-        </div>
+
       </div>
     </div>
     
@@ -353,7 +354,12 @@ export default defineComponent({
         this.audio.src = this.srcPath;
       }
       this.audio.currentTime = 0;
-      this.currentTime = this.audio.currentTime;
+      this.currentTime = 0;
+      
+      // Sync video reset when video embed is showing
+      if (this.showVideoEmbed && this.$refs.videoElement) {
+        (this.$refs.videoElement as HTMLVideoElement).currentTime = 0;
+      }
     },
     timeUpdateHandler() {
       if (this.isCurrent()) {

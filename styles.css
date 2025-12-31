@@ -318,38 +318,46 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--color-base-100);
 }
 
-/* Timeline - full width */
-.timeline {
-	height: 20px;
+/* Inline timeline - sits next to repeat button */
+.inline-timeline {
 	display: flex;
-	justify-content: space-between;
-	color: var(--color-base-50);
-	font-size: 0.85rem;
+	align-items: center;
+	gap: 4px;
+	margin-left: 8px;
+	font-size: 0.8rem;
 	font-family: var(--font-monospace);
-	margin-top: 4px;
+	color: var(--color-base-50);
 }
 
-/* Video mode timeline - lighter colors */
-.player-controls-wrapper.on-video .timeline {
+.inline-timeline .current-time {
+	cursor: pointer;
+	transition: color 0.15s ease;
+}
+
+.inline-timeline .current-time:hover {
+	color: var(--text-normal);
+}
+
+.inline-timeline .time-separator {
+	opacity: 0.5;
+}
+
+.inline-timeline .duration {
+	opacity: 0.7;
+}
+
+/* Video mode inline timeline - lighter colors */
+.player-controls-wrapper.on-video .inline-timeline {
 	color: rgba(255, 255, 255, 0.6);
 }
 
-.player-controls-wrapper.on-video .timeline>.current-time,
-.player-controls-wrapper.on-video .timeline>.duration {
+.player-controls-wrapper.on-video .inline-timeline .current-time,
+.player-controls-wrapper.on-video .inline-timeline .duration {
 	color: rgba(255, 255, 255, 0.8);
 }
 
-.player-controls-wrapper.on-video .timeline>.current-time:hover {
+.player-controls-wrapper.on-video .inline-timeline .current-time:hover {
 	color: #fff;
-}
-
-.timeline>.current-time {
-	cursor: pointer;
-	font-family: var(--font-monospace);
-}
-
-.timeline>.current-time:hover {
-	color: var(--text-normal);
 }
 
 /* Comment list */

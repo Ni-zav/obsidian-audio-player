@@ -1,5 +1,8 @@
 <template>
-  <div class="audio-player-ui" tabindex="0" v-on:click.prevent>
+  <div class="audio-player-ui" tabindex="-1" 
+       @click="handlePlayerClick"
+       @keydown="handleKeydown"
+       @mouseleave="handlePlayerMouseLeave">
     <div class="player-title">{{ displayTitle }}</div>
     
     <!-- Video wrapper - wraps around controls when video is showing -->
@@ -155,6 +158,13 @@ export default defineComponent({
       
       // Smooth time update animation frame
       animationFrameId: null as number | null,
+      
+      // Waveform scrubbing state
+      isScrubbing: false,
+      wasPlayingBeforeScrub: false,
+      
+      // Player hover state for keyboard shortcuts
+      isPlayerHovered: false,
     }
   },
   computed: {
@@ -719,7 +729,7 @@ export default defineComponent({
       return this.barForTime(time);
     },
     
-    // Handle waveform mousemove for realistic time display
+    // Handle waveform mousemove for realistic time display and scrubbing
     handleWaveformMouseMove(event: MouseEvent) {
       const time = this.getTimeFromMouseEvent(event);
       const barIndex = this.barForTime(time);
@@ -729,12 +739,89 @@ export default defineComponent({
       
       // Show/update tooltip with precise time
       this.showWaveformTooltip(event, time);
+      
+      // If scrubbing, update playhead position
+      if (this.isScrubbing) {
+        this.scrubToTime(time);
+      }
     },
     
-    // Handle waveform mousedown for seeking
+    // Handle waveform mousedown - start scrubbing
     handleWaveformMouseDown(event: MouseEvent) {
+      // Prevent text selection while scrubbing
+      event.preventDefault();
+      
       const time = this.getTimeFromMouseEvent(event);
-      this.setPlayheadSecs(time);
+      
+      // Start scrubbing
+      this.isScrubbing = true;
+      this.wasPlayingBeforeScrub = this.playing;
+      
+      // Optionally pause during scrub for smoother experience
+      if (this.playing) {
+        this.pause();
+      }
+      
+      // Set initial position
+      this.scrubToTime(time);
+      
+      // Add document-level listeners for mouseup and mousemove outside waveform
+      document.addEventListener('mouseup', this.handleDocumentMouseUp);
+      document.addEventListener('mousemove', this.handleDocumentMouseMove);
+    },
+    
+    // Handle document-level mousemove during scrubbing (for dragging outside waveform)
+    handleDocumentMouseMove(event: MouseEvent) {
+      if (!this.isScrubbing) return;
+      
+      const waveformEl = this.$refs.waveformAudio as HTMLElement;
+      if (!waveformEl || this.duration <= 0) return;
+      
+      const rect = waveformEl.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      // Clamp to valid range even if mouse is outside waveform
+      const ratio = Math.max(0, Math.min(1, x / rect.width));
+      const time = ratio * this.duration;
+      
+      this.scrubToTime(time);
+      this.showWaveformTooltip(event, time);
+    },
+    
+    // Handle document-level mouseup - stop scrubbing
+    handleDocumentMouseUp(event: MouseEvent) {
+      if (!this.isScrubbing) return;
+      
+      this.isScrubbing = false;
+      
+      // Remove document-level listeners
+      document.removeEventListener('mouseup', this.handleDocumentMouseUp);
+      document.removeEventListener('mousemove', this.handleDocumentMouseMove);
+      
+      // Resume playback if was playing before scrub
+      if (this.wasPlayingBeforeScrub) {
+        this.play();
+      }
+      
+      this.wasPlayingBeforeScrub = false;
+    },
+    
+    // Scrub to a specific time (update currentTime without triggering audio timeupdate)
+    scrubToTime(time: number) {
+      // Clamp time to valid range
+      const clampedTime = Math.max(0, Math.min(this.duration, time));
+      
+      this.currentTime = clampedTime;
+      
+      // Update audio element
+      if (!this.isCurrent()) {
+        this.audio.src = this.srcPath;
+      }
+      this.audio.currentTime = clampedTime;
+      
+      // Sync video if showing
+      if (this.showVideoEmbed && this.$refs.videoElement) {
+        (this.$refs.videoElement as HTMLVideoElement).currentTime = clampedTime;
+      }
     },
     
     // Show tooltip at mouse position
@@ -782,6 +869,32 @@ export default defineComponent({
         cancelAnimationFrame(this.animationFrameId);
         this.animationFrameId = null;
       }
+    },
+    
+    // Handle keyboard events - spacebar to toggle play/pause
+    handleKeydown(event: KeyboardEvent) {
+      // Only handle if player is focused
+      if (event.code === 'Space' || event.key === ' ') {
+        // Prevent default scrolling behavior
+        event.preventDefault();
+        event.stopPropagation();
+        
+        // Toggle play/pause
+        this.togglePlay();
+      }
+    },
+    
+    // Handle click inside player - focus for keyboard shortcuts
+    handlePlayerClick(event: MouseEvent) {
+      // Focus with preventScroll to avoid scroll jumping
+      this.$el.focus({ preventScroll: true });
+    },
+    
+    // Track when mouse leaves player area - blur to allow normal scrolling
+    handlePlayerMouseLeave() {
+      this.isPlayerHovered = false;
+      // Blur the element so spacebar scrolls normally outside
+      this.$el.blur();
     }
   },
 
@@ -882,6 +995,9 @@ export default defineComponent({
     this.audio.removeEventListener("timeupdate", this.timeUpdateHandler);
     // Stop smooth time updates
     this.stopSmoothTimeUpdate();
+    // Clean up scrubbing listeners if still active
+    document.removeEventListener('mouseup', this.handleDocumentMouseUp);
+    document.removeEventListener('mousemove', this.handleDocumentMouseMove);
   },
   beforeDestroy() {
     this.ro.unobserve(this.$el);
@@ -890,6 +1006,9 @@ export default defineComponent({
       this.waveformTooltipEl.remove();
       this.waveformTooltipEl = null;
     }
+    // Clean up scrubbing listeners if still active
+    document.removeEventListener('mouseup', this.handleDocumentMouseUp);
+    document.removeEventListener('mousemove', this.handleDocumentMouseMove);
   }
 })
 

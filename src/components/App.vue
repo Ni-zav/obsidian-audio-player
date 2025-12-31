@@ -58,7 +58,7 @@
               'played': i <= currentBar,
               'highlighted': highlightedBars.includes(i)
             }" @mouseover="setWvTimestampTooltip(i); highlightCommentForBar(i);" @mouseout="unhighlightComment();"
-                @mousedown="barMouseDownHandler(i);" :style="{ height: s * 25 + 'px' }">
+                @mousedown="barMouseDownHandler(i);" :style="{ height: s * 35 + 'px' }">
             </div>
           </div>
         </div>

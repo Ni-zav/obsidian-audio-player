@@ -139,7 +139,7 @@ If your plugin does not need CSS, delete this file.
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	margin-bottom: 8px;
+	margin-bottom: 0px;
 	gap: 8px;
 }
 
@@ -232,8 +232,8 @@ If your plugin does not need CSS, delete this file.
 .waveform-container {
 	position: relative;
 	width: 100%;
-	height: 50px;
-	margin-top: 6px;
+	height: 70px;
+	margin-top: 0;
 }
 
 /* Shared waveform styling */

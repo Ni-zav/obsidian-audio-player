@@ -53,12 +53,14 @@
           </div>
           
           <!-- Foreground layer: Audio waveform (variable height, on top) -->
-          <div class="waveform waveform-audio">
-            <div class="wv" ref="wv" v-for="(s, i) in filteredData" :key="srcPath + i" :class="{
+          <div class="waveform waveform-audio" ref="waveformAudio" 
+               @mousemove="handleWaveformMouseMove($event)" 
+               @mouseout="unhighlightComment(); hideWaveformTooltip();"
+               @mousedown="handleWaveformMouseDown($event)">
+            <div class="wv" v-for="(s, i) in filteredData" :key="srcPath + i" :class="{
               'played': i <= currentBar,
               'highlighted': highlightedBars.includes(i)
-            }" @mouseover="setWvTimestampTooltip(i); highlightCommentForBar(i);" @mouseout="unhighlightComment();"
-                @mousedown="barMouseDownHandler(i);" :style="{ height: s * 35 + 'px' }">
+            }" :style="{ height: s * 35 + 'px' }">
             </div>
           </div>
         </div>
@@ -141,6 +143,10 @@ export default defineComponent({
       
       // Video-specific state
       showVideoEmbed: false,
+      
+      // Waveform tooltip state for realistic hover time
+      waveformTooltipEl: null as HTMLElement | null,
+      waveformTooltipTimeout: null as ReturnType<typeof setTimeout> | null,
     }
   },
   computed: {
@@ -624,11 +630,67 @@ export default defineComponent({
       setTooltip(elem, "Copy timestamp", { 'delay': 150 });
     },
     setWvTimestampTooltip(i: number) {
-      const elem = this.$refs.wv[i];
+      // Legacy method kept for compatibility - no longer used for bar-by-bar tooltips
       const time = i / this.nSamples * this.duration;
-      setTooltip(elem, secondsToString(time), {
-        'delay': 150, 'placement': 'top'
-      });
+      return secondsToString(time);
+    },
+    
+    // Calculate precise time from mouse X position within waveform
+    getTimeFromMouseEvent(event: MouseEvent): number {
+      const waveformEl = this.$refs.waveformAudio as HTMLElement;
+      if (!waveformEl || this.duration <= 0) return 0;
+      
+      const rect = waveformEl.getBoundingClientRect();
+      const x = event.clientX - rect.left;
+      const ratio = Math.max(0, Math.min(1, x / rect.width));
+      return ratio * this.duration;
+    },
+    
+    // Get bar index from mouse position
+    getBarFromMouseEvent(event: MouseEvent): number {
+      const time = this.getTimeFromMouseEvent(event);
+      return this.barForTime(time);
+    },
+    
+    // Handle waveform mousemove for realistic time display
+    handleWaveformMouseMove(event: MouseEvent) {
+      const time = this.getTimeFromMouseEvent(event);
+      const barIndex = this.barForTime(time);
+      
+      // Highlight comment for this bar
+      this.highlightCommentForBar(barIndex);
+      
+      // Show/update tooltip with precise time
+      this.showWaveformTooltip(event, time);
+    },
+    
+    // Handle waveform mousedown for seeking
+    handleWaveformMouseDown(event: MouseEvent) {
+      const time = this.getTimeFromMouseEvent(event);
+      this.setPlayheadSecs(time);
+    },
+    
+    // Show tooltip at mouse position
+    showWaveformTooltip(event: MouseEvent, time: number) {
+      // Create tooltip element if it doesn't exist
+      if (!this.waveformTooltipEl) {
+        this.waveformTooltipEl = document.createElement('div');
+        this.waveformTooltipEl.className = 'waveform-time-tooltip';
+        document.body.appendChild(this.waveformTooltipEl);
+      }
+      
+      // Update tooltip content and position
+      this.waveformTooltipEl.textContent = secondsToString(time);
+      this.waveformTooltipEl.style.display = 'block';
+      this.waveformTooltipEl.style.left = `${event.clientX}px`;
+      this.waveformTooltipEl.style.top = `${event.clientY - 35}px`;
+    },
+    
+    // Hide waveform tooltip
+    hideWaveformTooltip() {
+      if (this.waveformTooltipEl) {
+        this.waveformTooltipEl.style.display = 'none';
+      }
     }
   },
 
@@ -725,6 +787,11 @@ export default defineComponent({
   },
   beforeDestroy() {
     this.ro.unobserve(this.$el);
+    // Clean up tooltip element
+    if (this.waveformTooltipEl) {
+      this.waveformTooltipEl.remove();
+      this.waveformTooltipEl = null;
+    }
   }
 })
 

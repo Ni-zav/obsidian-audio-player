@@ -459,3 +459,20 @@ If your plugin does not need CSS, delete this file.
 .player-main.video-mode .video-player {
 	display: block;
 }
+
+/* Waveform time tooltip - follows mouse for precise time display */
+.waveform-time-tooltip {
+	position: fixed;
+	z-index: 10000;
+	padding: 4px 8px;
+	background-color: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 4px;
+	font-size: 0.8rem;
+	font-family: var(--font-monospace);
+	color: var(--text-normal);
+	pointer-events: none;
+	transform: translateX(-50%);
+	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+	white-space: nowrap;
+}

@@ -19,6 +19,7 @@ export class AudioPlayerRenderer extends MarkdownRenderChild {
 			moodbar: this.options.moodbar,
 			mdElement: containerEl,
 			audio: this.options.player,
+			isVideo: this.options.isVideo,
 		});
 	}
 

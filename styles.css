@@ -270,3 +270,79 @@ If your plugin does not need CSS, delete this file.
 .current-comment.active-comment {
 	border-top: 1px solid transparent;
 }
+
+/* Video player styles */
+.video-container {
+	margin-bottom: 12px;
+}
+
+.video-toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 12px;
+	background: var(--background-modifier-hover);
+	border-radius: 6px;
+	cursor: pointer;
+	font-size: 0.85rem;
+	color: var(--text-muted);
+	transition: all 0.15s ease;
+	user-select: none;
+	margin-bottom: 8px;
+}
+
+.video-toggle:hover {
+	background: var(--background-modifier-active-hover);
+	color: var(--text-normal);
+}
+
+.video-toggle-icon {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+}
+
+.video-toggle-label {
+	font-weight: 500;
+}
+
+.video-wrapper {
+	position: relative;
+	width: 100%;
+	border-radius: 8px;
+	overflow: hidden;
+	background: var(--background-secondary);
+}
+
+.video-player {
+	display: block;
+	width: 100%;
+	max-height: 400px;
+	object-fit: contain;
+	background: #000;
+}
+
+.video-timestamp-overlay {
+	position: absolute;
+	bottom: 0;
+	left: 0;
+	right: 0;
+	padding: 8px 12px;
+	background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
+	display: flex;
+	justify-content: flex-start;
+	pointer-events: none;
+}
+
+.video-timestamp {
+	font-family: var(--font-monospace);
+	font-size: 0.9rem;
+	color: rgba(255, 255, 255, 0.9);
+	text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+	padding: 4px 8px;
+	background: rgba(0, 0, 0, 0.4);
+	border-radius: 4px;
+	backdrop-filter: blur(4px);
+}

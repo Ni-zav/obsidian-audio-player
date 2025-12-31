@@ -1,6 +1,27 @@
 <template>
   <div class="audio-player-ui" tabindex="0" v-on:click.prevent>
     <div class="player-title">{{ displayTitle }}</div>
+    <!-- Video container with toggle -->
+    <div v-if="isVideo" class="video-container">
+      <div class="video-toggle" @click="toggleVideoEmbed" ref="videoToggleButton">
+        <span class="video-toggle-icon" ref="videoToggleIcon"></span>
+        <span class="video-toggle-label">{{ showVideoEmbed ? 'Hide Video' : 'Show Video' }}</span>
+      </div>
+      <div v-show="showVideoEmbed" class="video-wrapper">
+        <video 
+          ref="videoElement"
+          class="video-player"
+          :src="srcPath"
+          @timeupdate="videoTimeUpdateHandler"
+          @loadedmetadata="videoLoadedHandler"
+          @play="videoPlayHandler"
+          @pause="videoPauseHandler"
+        ></video>
+        <div class="video-timestamp-overlay">
+          <span class="video-timestamp">{{ displayedCurrentTime }}</span>
+        </div>
+      </div>
+    </div>
     <div class="horiz">
       <div v-show="!smallSize" class="vert">
         <div class="playpause playpause-controls" @click="skipToBeginning" ref="skipBackButton"></div>
@@ -73,7 +94,8 @@ export default defineComponent({
     content: Object as PropType<HTMLElement>,
     moodbar: Object as PropType<HTMLElement>,
     mdElement: Object as PropType<HTMLElement>,
-    audio: Object as PropType<HTMLAudioElement>
+    audio: Object as PropType<HTMLAudioElement>,
+    isVideo: Boolean
   },
   data() {
     return {
@@ -97,6 +119,9 @@ export default defineComponent({
 
       ro: ResizeObserver,
       smallSize: false,
+      
+      // Video-specific state
+      showVideoEmbed: false,
     }
   },
   computed: {
@@ -181,6 +206,11 @@ export default defineComponent({
       if (this.isCurrent()) {
         this.audio.currentTime = time;
       }
+      
+      // Sync video if showing
+      if (this.showVideoEmbed && this.$refs.videoElement) {
+        (this.$refs.videoElement as HTMLVideoElement).currentTime = time;
+      }
     },
     toggleLooping() {
       this.looping = !this.looping;
@@ -188,6 +218,11 @@ export default defineComponent({
         this.audio.src = this.srcPath;
       }
       this.audio.loop = this.looping;
+      
+      // Sync video loop state
+      if (this.showVideoEmbed && this.$refs.videoElement) {
+        (this.$refs.videoElement as HTMLVideoElement).loop = this.looping;
+      }
     },
     togglePlay() {
       if (!this.isCurrent()) {
@@ -209,11 +244,23 @@ export default defineComponent({
       this.audio?.play();
       this.playing = true;
       this.setBtnIcon('pause');
+      
+      // Sync video play
+      if (this.showVideoEmbed && this.$refs.videoElement) {
+        const video = this.$refs.videoElement as HTMLVideoElement;
+        video.currentTime = this.audio.currentTime;
+        video.play();
+      }
     },
     pause() {
       this.audio?.pause();
       this.playing = false;
       this.setBtnIcon('play');
+      
+      // Sync video pause
+      if (this.showVideoEmbed && this.$refs.videoElement) {
+        (this.$refs.videoElement as HTMLVideoElement).pause();
+      }
     },
     globalPause() {
       const ev = new Event('allpause');
@@ -428,6 +475,78 @@ export default defineComponent({
       return this.endBars.includes(i) && isOverlapEnd;
     },
 
+    // Video-related methods
+    toggleVideoEmbed() {
+      this.showVideoEmbed = !this.showVideoEmbed;
+      this.updateVideoToggleIcon();
+      
+      // Sync video with current audio state when showing
+      if (this.showVideoEmbed && this.$refs.videoElement) {
+        const video = this.$refs.videoElement as HTMLVideoElement;
+        video.currentTime = this.currentTime;
+        video.loop = this.looping;
+        if (this.playing) {
+          video.play();
+        }
+      }
+    },
+    updateVideoToggleIcon() {
+      if (this.$refs.videoToggleIcon) {
+        setIcon(this.$refs.videoToggleIcon, this.showVideoEmbed ? 'eye-off' : 'eye');
+      }
+    },
+    videoTimeUpdateHandler() {
+      if (this.showVideoEmbed && this.$refs.videoElement) {
+        const video = this.$refs.videoElement as HTMLVideoElement;
+        // Sync audio with video time
+        if (this.isCurrent() && Math.abs(video.currentTime - this.audio.currentTime) > 0.5) {
+          this.audio.currentTime = video.currentTime;
+        }
+        this.currentTime = video.currentTime;
+      }
+    },
+    videoLoadedHandler() {
+      if (this.$refs.videoElement) {
+        const video = this.$refs.videoElement as HTMLVideoElement;
+        if (!this.duration) {
+          this.duration = video.duration;
+        }
+      }
+    },
+    videoPlayHandler() {
+      if (this.showVideoEmbed) {
+        // Sync audio playback
+        if (!this.isCurrent()) {
+          this.audio.src = this.srcPath;
+        }
+        const video = this.$refs.videoElement as HTMLVideoElement;
+        this.audio.currentTime = video.currentTime;
+        this.audio.play();
+        this.playing = true;
+        this.setBtnIcon('pause');
+      }
+    },
+    videoPauseHandler() {
+      if (this.showVideoEmbed && !this.audio.paused) {
+        this.audio.pause();
+        this.playing = false;
+        this.setBtnIcon('play');
+      }
+    },
+    syncVideoWithAudio() {
+      if (this.showVideoEmbed && this.$refs.videoElement) {
+        const video = this.$refs.videoElement as HTMLVideoElement;
+        if (Math.abs(video.currentTime - this.audio.currentTime) > 0.5) {
+          video.currentTime = this.audio.currentTime;
+        }
+        if (this.playing && video.paused) {
+          video.play();
+        } else if (!this.playing && !video.paused) {
+          video.pause();
+        }
+      }
+    },
+
     copyTimestampToClipboard() {
       navigator.clipboard.writeText(this.displayedCurrentTime);
     },
@@ -452,14 +571,28 @@ export default defineComponent({
     this.setBtnIcon('play');
     setIcon(this.$refs.loopButton, 'repeat');
     setIcon(this.$refs.skipBackButton, 'skip-back');
+    
+    // Initialize video toggle icon if video
+    if (this.isVideo) {
+      this.updateVideoToggleIcon();
+    }
 
     // Add event listeners
     document.addEventListener('allpause', () => {
       this.setBtnIcon('play');
+      // Pause video if showing
+      if (this.showVideoEmbed && this.$refs.videoElement) {
+        (this.$refs.videoElement as HTMLVideoElement).pause();
+      }
     });
     document.addEventListener('allresume', () => {
-      if (this.isCurrent())
+      if (this.isCurrent()) {
         this.setBtnIcon('pause');
+        // Resume video if showing
+        if (this.showVideoEmbed && this.$refs.videoElement) {
+          (this.$refs.videoElement as HTMLVideoElement).play();
+        }
+      }
     })
     document.addEventListener('looptoggle', () => {
       if (this.isCurrent())

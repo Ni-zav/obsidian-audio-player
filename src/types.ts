@@ -18,4 +18,5 @@ export type AudioPlayerRendererOptions = {
 	title: string;
 	content: HTMLElement;
 	moodbar: HTMLElement;
+	isVideo?: boolean;
 };

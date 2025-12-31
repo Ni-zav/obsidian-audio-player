@@ -165,12 +165,14 @@ export default class AudioPlayer extends Plugin {
 					"m4a",
 					"webm"
 				];
+				const videoExtensions = ["mp4", "webm"];
 				const link = this.app.metadataCache.getFirstLinkpathDest(
 					getLinkpath(filename),
 					filename
 				);
 				if (!link || !allowedExtensions.includes(link.extension))
 					return;
+				const isVideo = videoExtensions.includes(link.extension.toLowerCase());
 				
 				// Parse title (if none, use file name)
 				let calloutTitle = callout.find('.callout-title').innerText;
@@ -220,6 +222,7 @@ export default class AudioPlayer extends Plugin {
 								moodbar: moodbar,
 								ctx,
 								player,
+								isVideo,
 							})
 						);
 					});
@@ -252,6 +255,7 @@ export default class AudioPlayer extends Plugin {
 							moodbar: moodbar,
 							ctx,
 							player,
+							isVideo,
 						})
 					);
 				}

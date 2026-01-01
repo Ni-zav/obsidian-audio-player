@@ -87,7 +87,10 @@
     </div>
     
     <!-- Comment list -->
-    <div class="comment-list" :class="{ 'is-playing': playing && activeComment != null }">
+    <div class="comment-list" :class="{ 
+      'is-playing': playing && activeComment != null,
+      'video-hidden': !isVideo || !showVideoEmbed
+    }">
       <AudioCommentVue ref="audiocomment" v-for="cmt in commentsSorted" :class="{
         'active-comment': cmt == activeComment,
         'active-parent-comment': isActiveParentComment(cmt),
@@ -240,8 +243,11 @@ export default defineComponent({
       );
       
       if (currentComments.length > 0) {
-        // Pick the most nested comment (last one in the list)
-        this.activeComment = currentComments[currentComments.length - 1];
+        // Pick the most nested comment - the one with the LATEST start time
+        // This is the most recently entered segment, which is the "active" one
+        this.activeComment = currentComments.reduce((mostNested, current) => {
+          return current.timeStart > mostNested.timeStart ? current : mostNested;
+        });
       } else {
         this.activeComment = null;
       }
@@ -474,7 +480,11 @@ export default defineComponent({
           this.currentTime >= x.timeStart && this.currentTime <= x.timeEnd
         );
         if (currentComments.length > 0) {
-          const activeComment = currentComments[currentComments.length - 1];
+          // Pick the most nested comment - the one with the LATEST start time
+          // This is the most recently entered segment, which is the "active" one
+          const activeComment = currentComments.reduce((mostNested, current) => {
+            return current.timeStart > mostNested.timeStart ? current : mostNested;
+          });
           if (activeComment != this.activeComment) {
             const commentEl = this.$refs.audiocomment[activeComment.index].$el;
             commentEl.scrollIntoView({ block: 'nearest', inline: 'start', behavior: 'smooth' });
@@ -574,12 +584,14 @@ export default defineComponent({
       ).sort((x: AudioComment, y: AudioComment) => x.rank - y.rank);
     },
     
-    // Check if a comment is a parent of the currently active comment
+    // Check if a comment contains the current time but is not the active comment
+    // This highlights all overlapping comments with the purple tint
     isActiveParentComment(cmt: AudioComment): boolean {
       if (!this.activeComment) return false;
+      // A comment is an active parent if it contains the current time but is not the active comment
       return cmt !== this.activeComment &&
-             cmt.timeStart <= this.activeComment.timeStart &&
-             cmt.timeEnd >= this.activeComment.timeEnd;
+             this.currentTime >= cmt.timeStart &&
+             this.currentTime <= cmt.timeEnd;
     },
     commentForBar(i: number) {
       const cmts = this.commentsForBar(i).sort(

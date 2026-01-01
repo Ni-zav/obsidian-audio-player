@@ -365,6 +365,11 @@ If your plugin does not need CSS, delete this file.
 	flex-shrink: 0;
 }
 
+/* When video is hidden, give more space to comments */
+.comment-list.video-hidden {
+	max-height: 70vh;
+}
+
 .comment {
 	margin-left: 5px;
 	margin-bottom: 0.5em;

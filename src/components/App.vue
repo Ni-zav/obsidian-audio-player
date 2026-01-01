@@ -87,7 +87,7 @@
     </div>
     
     <!-- Comment list -->
-    <div class="comment-list">
+    <div class="comment-list" :class="{ 'is-playing': playing && activeComment != null }">
       <AudioCommentVue ref="audiocomment" v-for="cmt in commentsSorted" :class="{
         'active-comment': cmt == activeComment,
         'active-parent-comment': isActiveParentComment(cmt),
@@ -216,10 +216,36 @@ export default defineComponent({
       return Math.max(0, Math.min(100, progressInBar * 100));
     }
   },
+  watch: {
+    // Update active comment whenever current time changes (even when paused)
+    currentTime() {
+      this.updateActiveComment();
+    }
+  },
   methods: {
     getSectionInfo() { return this.ctx.getSectionInfo(this.mdElement); },
     getParentWidth() { return this.mdElement.clientWidth },
     isCurrent() { return this.audio.src === this.srcPath; },
+    
+    // Update active comment based on current time (works even when paused)
+    updateActiveComment() {
+      if (this.comments.length === 0) {
+        this.activeComment = null;
+        return;
+      }
+      
+      // Find all comments that contain the current time
+      const currentComments = this.commentsSorted.filter((x: AudioComment) =>
+        this.currentTime >= x.timeStart && this.currentTime <= x.timeEnd
+      );
+      
+      if (currentComments.length > 0) {
+        // Pick the most nested comment (last one in the list)
+        this.activeComment = currentComments[currentComments.length - 1];
+      } else {
+        this.activeComment = null;
+      }
+    },
     
     // Get style for a waveform bar - uses CSS variable for smooth progress animation
     getBarStyle(s: number, i: number) {

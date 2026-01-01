@@ -438,18 +438,46 @@ If your plugin does not need CSS, delete this file.
 	color: var(--white);
 }
 
+/* During playback ONLY, all non-active comments get slightly reduced opacity for text */
+.comment-list.is-playing .comment {
+	opacity: 0.6;
+}
+
+/* Active comment gets full opacity (fully visible) */
 .active-comment,
 .active-comment:hover,
 .active-comment.highlighted-comment {
 	background-color: var(--background-modifier-active-hover);
+	opacity: 1 !important;
 }
 
 /* Parent comment highlighting - when a nested comment is active, 
-   parent comments (larger time ranges) also get highlighted with reduced opacity */
-.active-parent-comment,
+   parent comments (larger time ranges) get highlighted with a distinct purple tint
+   to differentiate from the active comment, while maintaining text readability */
+.active-parent-comment {
+	/* Use a lighter purple-tinted background when paused (dimmer color, not dimmed text) */
+	background-color: rgba(180, 160, 240, 0.08);
+	/* No text opacity reduction - text stays fully visible */
+}
+
 .active-parent-comment:hover {
-	background-color: var(--background-modifier-active-hover);
-	opacity: 0.5;
+	/* Slightly more saturated on hover */
+	background-color: rgba(180, 160, 240, 0.12);
+}
+
+/* When playing, make parent comment backgrounds more vibrant */
+.comment-list.is-playing .active-parent-comment {
+	background-color: rgba(180, 160, 240, 0.18);
+}
+
+.comment-list.is-playing .active-parent-comment:hover {
+	background-color: rgba(180, 160, 240, 0.25);
+}
+
+/* Ensure active comment always wins with full opacity and standard background */
+.active-comment {
+	opacity: 1 !important;
+	background-color: var(--background-modifier-active-hover) !important;
 }
 
 .highlighted-comment {

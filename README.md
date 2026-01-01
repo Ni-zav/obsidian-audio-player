@@ -1,6 +1,6 @@
 # Obsidian Music Player
 
-This is a fork of the wonderful [noonesimg/obsidian-audio-player](https://github.com/noonesimg/obsidian-audio-player). It's tweaked to better fit the use case of annotating specifically music files, rather than long audios like podcasts, though it can be used for both.
+This is a fork of [catetrai/obsidian-audio-player](https://github.com/catetrai/obsidian-audio-player), which itself is forked from the original [noonesimg/obsidian-audio-player](https://github.com/noonesimg/obsidian-audio-player). It's tweaked to better fit the use case of annotating specifically music files, rather than long audios like podcasts, though it can be used for both.
 
 ## Features
 

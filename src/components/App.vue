@@ -2,6 +2,7 @@
   <div class="audio-player-ui" tabindex="-1" 
        @click="handlePlayerClick"
        @keydown="handleKeydown"
+       @mouseenter="handlePlayerMouseEnter"
        @mouseleave="handlePlayerMouseLeave">
     <div class="player-title">{{ displayTitle }}</div>
     
@@ -887,6 +888,14 @@ export default defineComponent({
     // Handle click inside player - focus for keyboard shortcuts
     handlePlayerClick(event: MouseEvent) {
       // Focus with preventScroll to avoid scroll jumping
+      this.$el.focus({ preventScroll: true });
+    },
+    
+    
+    // Handle mouse enter player - focus for keyboard shortcuts (hover enables spacebar control)
+    handlePlayerMouseEnter() {
+      this.isPlayerHovered = true;
+      // Auto-focus the player so keyboard shortcuts work immediately on hover
       this.$el.focus({ preventScroll: true });
     },
     

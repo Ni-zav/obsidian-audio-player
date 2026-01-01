@@ -444,6 +444,14 @@ If your plugin does not need CSS, delete this file.
 	background-color: var(--background-modifier-active-hover);
 }
 
+/* Parent comment highlighting - when a nested comment is active, 
+   parent comments (larger time ranges) also get highlighted with reduced opacity */
+.active-parent-comment,
+.active-parent-comment:hover {
+	background-color: var(--background-modifier-active-hover);
+	opacity: 0.5;
+}
+
 .highlighted-comment {
 	background-color: #ffffff10;
 }

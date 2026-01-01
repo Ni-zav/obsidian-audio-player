@@ -90,6 +90,7 @@
     <div class="comment-list">
       <AudioCommentVue ref="audiocomment" v-for="cmt in commentsSorted" :class="{
         'active-comment': cmt == activeComment,
+        'active-parent-comment': isActiveParentComment(cmt),
         'current-comment': cmt == currentComment,
         'highlighted-comment': cmt == highlightedComment
       }" @move-playhead="setPlayheadSecs" @mouseover="highlightBars(barsForComment(cmt))"
@@ -422,17 +423,23 @@ export default defineComponent({
         this.currentTime = this.audio?.currentTime;
 
         // Calculate current comment (comment where the current time marker should be displayed)
+        // The current comment is the next comment whose END time is after the current time
         if (this.comments.length > 0) {
           const firstComment = this.commentsSorted[0];
           if (this.currentTime <= firstComment.timeStart) {
             this.currentComment = firstComment;
-          } else if (this.currentTime > this.commentsSorted[this.comments.length - 1].timeStart) {
-            this.currentComment = null;  // means it's the last pseudo-comment element
           } else {
-            const pastComments = this.commentsSorted.filter((x: AudioComment) =>
-              this.currentTime <= x.timeStart
+            // Find comments whose end time is after current time (not yet finished)
+            const upcomingComments = this.commentsSorted.filter((x: AudioComment) =>
+              this.currentTime < x.timeEnd
             );
-            this.currentComment = this.commentsSorted[pastComments[0].index];
+            if (upcomingComments.length > 0) {
+              // The current comment is the first one that hasn't ended yet
+              this.currentComment = upcomingComments[0];
+            } else {
+              // All comments have ended
+              this.currentComment = null;
+            }
           }
         }
 
@@ -539,6 +546,14 @@ export default defineComponent({
       return this.comments.filter((c: AudioComment) =>
         hasOverlap([c.timeStart, c.timeEnd], [barTimeStart, barTimeEnd])
       ).sort((x: AudioComment, y: AudioComment) => x.rank - y.rank);
+    },
+    
+    // Check if a comment is a parent of the currently active comment
+    isActiveParentComment(cmt: AudioComment): boolean {
+      if (!this.activeComment) return false;
+      return cmt !== this.activeComment &&
+             cmt.timeStart <= this.activeComment.timeStart &&
+             cmt.timeEnd >= this.activeComment.timeEnd;
     },
     commentForBar(i: number) {
       const cmts = this.commentsForBar(i).sort(

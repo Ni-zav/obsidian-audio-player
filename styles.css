@@ -115,6 +115,7 @@ If your plugin does not need CSS, delete this file.
 .player-main.video-mode .video-player {
 	display: block;
 	width: 100%;
+	height: auto;
 	max-height: 40vh;
 	object-fit: contain;
 	cursor: pointer;

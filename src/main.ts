@@ -1,6 +1,8 @@
 import {
+	Editor,
 	getLinkpath,
 	MarkdownPostProcessorContext,
+	MarkdownView,
 	Notice,
 	Plugin,
 	resolveSubpath,
@@ -123,6 +125,21 @@ export default class AudioPlayer extends Plugin {
 			}
 		});
 
+		this.addCommand({
+			id: "insert-player",
+			name: "Insert audio/video player",
+			editorCallback: (editor: Editor, view: MarkdownView) => {
+				const template = "> [!audio-video-player]\n> [[]]";
+				const cursor = editor.getCursor();
+				editor.replaceRange(template, cursor);
+				// Position cursor inside the [[ ]] (2 characters before the end)
+				editor.setCursor({
+					line: cursor.line + 1,
+					ch: 4  // Position after "> [["
+				});
+			}
+		});
+
 		// Treat subtitle/lyrics files as Markdown files that can be
 		// opened in the viewer and editor
 		this.registerExtensions(['lrc', 'srt', 'vtt'], 'markdown');
@@ -147,7 +164,7 @@ export default class AudioPlayer extends Plugin {
 				el: HTMLElement,
 				ctx: MarkdownPostProcessorContext
 			) => {
-			const callouts = el.findAll('.callout[data-callout="music-player"]');
+			const callouts = el.findAll('.callout[data-callout="audio-video-player"], .callout[data-callout="music-player"]');
 
 			for (const callout of callouts) {
 				const calloutContent = callout.find('.callout-content');
@@ -176,7 +193,7 @@ export default class AudioPlayer extends Plugin {
 				
 				// Parse title (if none, use file name)
 				let calloutTitle = callout.find('.callout-title').innerText;
-				if (!calloutTitle || calloutTitle == 'Music player')
+				if (!calloutTitle || calloutTitle == 'Audio video player' || calloutTitle == 'Music player')
 					calloutTitle = link.basename;
 
 				// Parse moodbar image (must be embedded image link)

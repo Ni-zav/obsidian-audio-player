@@ -6,6 +6,7 @@ available in the app when your plugin is enabled.
 If your plugin does not need CSS, delete this file.
 
 */
+.callout[data-callout="audio-video-player"],
 .callout[data-callout="music-player"] {
 	--callout-color: 191, 168, 255;
 	--callout-icon: audio-lines;
